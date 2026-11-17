@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Change the class login · Year 10 Media Exam Hub</title>
+<style>
+  :root{color-scheme:dark}
+  *{box-sizing:border-box}
+  body{margin:0;background:#0d1017;color:#e9edf5;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:640px;margin:0 auto;padding:36px 16px 64px}
+  h1{font-size:1.7rem;margin:0 0 6px} h2{font-size:1.1rem;margin:28px 0 8px;color:#f5b83d}
+  p{margin:0 0 12px;color:#b9c0cc} b{color:#e9edf5}
+  fieldset{border:1px solid #2a3142;border-radius:14px;padding:16px 18px;margin:0 0 16px;background:#151a24}
+  legend{padding:0 8px;font-weight:700}
+  label{display:block;font-weight:600;margin:10px 0 4px}
+  input[type=text],input[type=password]{width:100%;padding:11px 12px;border-radius:10px;border:1px solid #39425a;background:#0d1017;color:#fff;font:inherit}
+  input:focus-visible,button:focus-visible{outline:3px solid #7dd3ff;outline-offset:2px}
+  .chk{display:flex;gap:10px;align-items:flex-start;font-weight:400;margin-top:12px}
+  button{font:inherit;font-weight:700;padding:12px 20px;border-radius:999px;border:0;background:#f5b83d;color:#1a1300;cursor:pointer}
+  button:disabled{opacity:.6;cursor:wait}
+  #msg{margin-top:16px;padding:14px 16px;border-radius:12px;display:none}
+  #msg.ok{display:block;background:#12301f;border:1px solid #2f7d4f} #msg.bad{display:block;background:#3a1518;border:1px solid #a33a43}
+  ol{padding-left:22px;color:#b9c0cc} li{margin:0 0 6px} code{background:#222a3a;padding:1px 6px;border-radius:6px;color:#fff}
+  a{color:#7dd3ff}
+</style>
+</head>
+<body>
+<main>
+  <h1>Change the class login</h1>
+  <p>For the teacher. This page makes a new <code>login.js</code> file for the Year 10 Media Exam Hub. Everything happens in your browser: nothing you type is sent anywhere or saved.</p>
+
+  <form id="f" autocomplete="off">
+    <fieldset><legend>Current login</legend>
+      <label for="cu">Current username</label><input id="cu" type="text" autocapitalize="none" spellcheck="false" required>
+      <label for="cp">Current password</label><input id="cp" type="password" required>
+    </fieldset>
+    <fieldset><legend>New login</legend>
+      <label for="nu">New username</label><input id="nu" type="text" autocapitalize="none" spellcheck="false" required>
+      <label for="np">New password</label><input id="np" type="text" spellcheck="false" required minlength="6">
+      <p style="margin:8px 0 0;font-size:.9rem">The username is not case-sensitive. The password is. Use at least six characters.</p>
+      <label class="chk"><input id="keep" type="checkbox"> <span>Keep the old login working as well (useful if some students already know it)</span></label>
+    </fieldset>
+    <button type="submit">Make the new login file</button>
+  </form>
+  <div id="msg" role="status"></div>
+
+  <h2>Then upload it</h2>
+  <ol>
+    <li>Your browser will download a file called <code>login.js</code>.</li>
+    <li>In your GitHub repository, open the <code>assets</code> folder and choose <b>Add file → Upload files</b>.</li>
+    <li>Drag in the new <code>login.js</code> so that it replaces the old one, then choose <b>Commit changes</b>.</li>
+    <li>Wait a minute or two, then try the new login on the site. If the old one still works, refresh the page once.</li>
+  </ol>
+  <p><b>Good to know:</b> a student who ticked “Keep me signed in” stays signed in on that device until they sign out. Changing the login stops new sign-ins with the old password; it does not sign anyone out. To shut everyone out completely, the site needs to be rebuilt with a new key (see the README).</p>
+  <p><a href="../index.html">← Back to the hub</a></p>
+</main>
+<script src="../assets/login.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id), msg = $('msg');
+  const bytes = b64 => Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const toB64 = u => btoa(String.fromCharCode(...u));
+  const say = (cls, html) => { msg.className = cls; msg.innerHTML = html; };
+  async function derive(user, pass, salt, iter) {
+    const km = await crypto.subtle.importKey('raw', new TextEncoder().encode(user.trim().toLowerCase() + '\n' + pass.trim()), 'PBKDF2', false, ['deriveBits']);
+    return new Uint8Array(await crypto.subtle.deriveBits({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, km, 256));
+  }
+  async function open(raw, b64) {
+    const buf = bytes(b64), key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['decrypt']);
+    return new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.subarray(0, 12) }, key, buf.subarray(12)));
+  }
+  async function seal(raw, plain) {
+    const iv = crypto.getRandomValues(new Uint8Array(12)), key = await crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt']);
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, plain));
+    const out = new Uint8Array(12 + ct.length); out.set(iv); out.set(ct, 12); return toB64(out);
+  }
+  if (!window.HUB_LOGIN) say('bad', 'This page could not find <code>assets/login.js</code>. Open it from the hub website (or from the full site folder), not on its own.');
+  $('f').addEventListener('submit', async e => {
+    e.preventDefault(); const L = window.HUB_LOGIN; if (!L) return;
+    const b = e.target.querySelector('button'); b.disabled = true; msg.className = '';
+    try {
+      let ck = null, used = null;
+      for (const l of L.logins) { try { ck = await open(await derive($('cu').value, $('cp').value, bytes(l.salt), L.iter), l.key); used = l; break; } catch { /* try the next one */ } }
+      if (!ck) { say('bad', '<b>The current login is not right.</b> Check the spelling. The password is case-sensitive.'); return; }
+      if ($('np').value.trim().length < 6) { say('bad', '<b>Choose a longer password:</b> at least six characters.'); return; }
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const entry = { salt: toB64(salt), key: await seal(await derive($('nu').value, $('np').value, salt, L.iter), ck) };
+      const logins = $('keep').checked ? [entry, used] : [entry];
+      const js = '/* Class login for the Year 10 Media Exam Hub. Replace this file to change the login (see teacher/change-login.html). */\nwindow.HUB_LOGIN=' + JSON.stringify({ v: 1, iter: L.iter, logins }) + ';\n';
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([js], { type: 'text/javascript' })); a.download = 'login.js'; document.body.append(a); a.click(); a.remove();
+      say('ok', '<b>Done.</b> A new <code>login.js</code> has been downloaded. Upload it to the <code>assets</code> folder of your repository to switch the site to the new login' + ($('keep').checked ? ' (the old one will keep working too).' : '.'));
+    } catch (err) { say('bad', '<b>Something went wrong:</b> ' + (err && err.message || err)); }
+    finally { b.disabled = false; }
+  });
+})();
+</script>
+</body>
+</html>
