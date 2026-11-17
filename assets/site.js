@@ -223,12 +223,17 @@
     root.addEventListener('input', e => { if (e.target.tagName === 'TEXTAREA') { st[e.target.closest('.gymq').dataset.id] = e.target.value; store.set('gym', st); } });
   };
 
+  // Camera Movement Lab: a 3D set loaded on demand from assets/camlab.js
+  let camlabLoad = null;
   C.moves = (root, list) => {
-    const view = $('.view', root), cap = $('.cap', root), tabs = $('.tabs', root);
-    tabs.innerHTML = list.map((m, i) => `<button class="tab" role="tab" data-i="${i}">${m.n}</button>`).join('');
-    tabs.onclick = e => { const b = e.target.closest('.tab'); if (!b) return; const m = list[b.dataset.i];
-      $$('.tab', tabs).forEach(t => t.setAttribute('aria-selected', t === b)); view.dataset.move = ''; void view.offsetWidth;
-      setTimeout(() => view.dataset.move = m.k, 350); cap.innerHTML = `<h4>${m.n}</h4><p>${m.d}</p><p class="small muted">${m.use}</p>`; };
+    root.innerHTML = '<div class="cl-wait box center"><p class="muted">Setting up the 3D camera…</p></div>';
+    const go = () => {
+      camlabLoad = camlabLoad || new Promise((ok, bad) => { const sc = document.createElement('script'); sc.src = 'assets/camlab.js?v=' + (document.querySelector('script[src*="site.js"]')?.src.split('v=')[1] || '1'); sc.onload = ok; sc.onerror = bad; document.head.append(sc); });
+      camlabLoad.then(() => window.CamLab.mount(root, list)).catch(() => { root.innerHTML = '<div class="box"><p>The 3D camera could not load. Check your connection and refresh the page.</p></div>'; });
+    };
+    if (!('IntersectionObserver' in window)) return go();
+    const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { io.disconnect(); go(); } }, { rootMargin: '600px 0px' });
+    io.observe(root);
   };
 
   C.comp = (root, list) => {
